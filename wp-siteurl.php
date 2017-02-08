@@ -76,10 +76,11 @@ function wp_siteurl_is_valid() {
 // }
 // add_action( 'init', 'process_post' );
 
-function wp_siteurl_redirect( $location, $request, $user ) {
+function wp_siteurl_redirect( $location, $status ) {
+  echo $location;
   return $location;
 }
-add_filter( 'wp_redirect', 'wp_siteurl_redirect', 1000, 3 );
+add_filter( 'wp_redirect', 'wp_siteurl_redirect', 1000, 2 );
 
 // function wp_siteurl_login_redirect( $location, $request, $user ) {
 //   // return $location;
@@ -103,7 +104,7 @@ function wp_siteurl_url_replace($url, $search_url = "", $replace_url = "") {
     // URL matches siteurl in db
     $replace_uri = preg_replace("~^$protocol_pattern~", "", $replace_url);
     $replace = preg_match("~^$protocol_pattern~", $url) ? $replace_url : $replace_uri;
-    $new_url = preg_replace($siteurl_pattern, $replace, "${1}$url");
+    $new_url = preg_replace($siteurl_pattern, $replace, $url);
     // echo "$url -> $new_url<br/>";
   } else {
     $new_url = $url;
