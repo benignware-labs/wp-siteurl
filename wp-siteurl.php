@@ -77,7 +77,6 @@ function wp_siteurl_is_valid() {
 // add_action( 'init', 'process_post' );
 
 function wp_siteurl_redirect( $location, $status ) {
-  echo $location;
   return $location;
 }
 add_filter( 'wp_redirect', 'wp_siteurl_redirect', 1000, 2 );
