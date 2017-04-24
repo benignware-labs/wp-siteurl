@@ -1,12 +1,12 @@
 # wp-siteurl
 
-> Fix Site URL Conflicts 
+> Fix Site URL Conflicts
 
 ## Install
 
 ### Install manually
 
-Download and copy `siteurl.php` to `./wp-content/muplugins`.
+Download and copy `siteurl.php` to `./wp-content/mu-plugins`.
 
 ### Install via composer
 
