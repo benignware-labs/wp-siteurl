@@ -2,7 +2,7 @@
 
 /**
  Plugin Name: Site URL
- Plugin URI: http://github.com/benignware/wp-bootstrap-hooks
+ Plugin URI: https://github.com/benignware-labs/wp-siteurl
  Description: Fix Site URL Conflicts
  Version: 0.0.1
  Author: Rafael Nowrotek, Benignware
@@ -20,8 +20,7 @@ function wp_siteurl_get_baseurl() {
   } else {
     $file = $path . "/wp-config.php";
   }
-  $url = rtrim( (((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . "/" . rtrim(dirname(str_replace($_SERVER['DOCUMENT_ROOT'], '', $file)), "./"), "/" );
-  // TODO: WPSiteUrlCache
+  $url = rtrim( (((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . "/" . trim(dirname(str_replace($_SERVER['DOCUMENT_ROOT'], '', $file)), "./"), "/" );
   return $url;
 }
 
@@ -227,7 +226,7 @@ function wp_siteurl_notice() {
   $id = uniqid();
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
-  $message = "Site URL <code>$siteurl</code> conflicts with Base URL";
+  $message = "Site URL <code>$siteurl</code> conflicts with Base URL <code>$baseurl</code>";
   if ($siteurl != $baseurl) : ?>
     <div id="siteurl-notice-<?= $id; ?>" class="notice notice-warning is-dismissible">
       <h3 class="notice-title">Site URL Conflict</h3>
