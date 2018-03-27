@@ -11,7 +11,7 @@
     "homepage": "http://benignware.com"
   }],
   "keywords": [
-    "wordpress", "wordpress-plugin"
+    "wordpress", "wordpress-muplugin"
   ],
   "support": {
     "issues": "https://github.com/benignware-labs/wp-siteurl"
