@@ -4,118 +4,95 @@
  Plugin Name: Site URL
  Plugin URI: https://github.com/benignware-labs/wp-siteurl
  Description: Fix Site URL Conflicts
- Version: 0.0.2
+ Version: 0.0.3
  Author: Rafael Nowrotek, Benignware
  Author URI: http://benignware.com
  License: MIT
 */
 
+require_once 'lib/settings.php';
+
+function wp_siteurl_env() {
+  return in_array($_SERVER['SERVER_NAME'], array(
+    'localhost',
+    '127.0.0.1',
+    '10.37.129.2',
+    '10.0.2.2'
+  )) ? 'development' : 'production';
+}
+
+function wp_siteurl_is_enabled() {
+  $env = wp_siteurl_env();
+  $options = get_option('siteurl_options');
+
+  return ($env === 'development' && $options['environment']['development'])
+    || ($env === 'production' && $options['environment']['production']);
+}
+
 function wp_siteurl_get_baseurl() {
   if (defined('WP_BASE_URL')) {
     return WP_BASE_URL;
   }
+
   $path = ABSPATH ? ABSPATH : get_home_path();
+
   if (file_exists(dirname($path) . "/wp-config.php")) {
     $file = dirname($path) . "/wp-config.php";
   } else {
     $file = $path . "/wp-config.php";
   }
+
   $url = rtrim( (((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . "/" . trim(dirname(str_replace($_SERVER['DOCUMENT_ROOT'], '', $file)), "./"), "/" );
+
   return $url;
 }
 
 function wp_siteurl_get_option($name = 'siteurl') {
   global $wpdb;
+
   $opt = $wpdb->get_row("SELECT * FROM $wpdb->options WHERE option_name = '$name'");
+
   if ($opt) {
     return $opt->option_value;
   }
+
   return null;
 }
 
 function wp_siteurl_is_valid() {
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
-  return $siteurl == $baseurl;
+
+  return $siteurl === $baseurl;
 }
 
-// function wp_siteurl_admin_init() {
-//   //echo "ADMIN";
-// }
-// add_action( 'admin_init', 'wp_siteurl_admin_init', 1000 );
-
-// function wp_siteurl_filter( $value ) {
-//   $value = wp_siteurl_get_baseurl();
-//   return $value;
-// }
-
-
-
-// define('FORCE_SSL_ADMIN', false);
-// $baseurl = wp_siteurl_get_baseurl();
-//
-// update_option('siteurl', $baseurl);
-// update_option('home', $baseurl);
-
-//
-// if (!defined('WP_HOME')) {
-//   define('WP_HOME', $baseurl);
-// }
-//
-// if (!defined('WP_SITEURL')) {
-//   define('WP_SITEURL', $baseurl);
-// }
-
-// if (!defined('WP_SITEURL')) {
-//   define( 'WP_CONTENT_URL', get_option('siteurl') . '/wp-content' );
-// }
-
-// function process_post() {
-//
-// }
-// add_action( 'init', 'process_post' );
-
-function wp_siteurl_redirect( $location, $status ) {
-  return $location;
-}
-add_filter( 'wp_redirect', 'wp_siteurl_redirect', 1000, 2 );
-
-// function wp_siteurl_login_redirect( $location, $request, $user ) {
-//   // return $location;
-//   echo "LOGIN: $request";
-//   // exit;
-//   return null;
-//   return $location;
-// }
-// add_filter( 'login_redirect', 'wp_siteurl_login_redirect', 1000, 3 );
-
-function wp_siteurl_url_replace($url, $search_url = "", $replace_url = "") {
+function wp_siteurl_url_replace($url, $search_url = '', $replace_url = '') {
   if (!$search_url) {
     return $url;
   }
+
   $protocol_pattern = "https?\:\/\/";
   $search_uri = preg_replace("~^$protocol_pattern~", "", $search_url);
   $siteurl_pattern = "~^($protocol_pattern)?" . preg_quote($search_uri) . "~";
-  // echo "URL: $url  0000 $search_url 00000 $siteurl_pattern<br/>";
+
   if (preg_match($siteurl_pattern, $url)) {
-    // echo "MATCH: " . $siteurl_pattern . " ...";
-    // URL matches siteurl in db
     $replace_uri = preg_replace("~^$protocol_pattern~", "", $replace_url);
     $replace = preg_match("~^$protocol_pattern~", $url) ? $replace_url : $replace_uri;
     $new_url = preg_replace($siteurl_pattern, $replace, $url);
-    // echo "$url -> $new_url<br/>";
   } else {
     $new_url = $url;
-    // echo "unreplaced $url<br/>";
   }
-  // echo "$url --> $replace --> $new_url<br/>";
-  // exit;
   return $new_url;
 }
 
 function wp_siteurl_get_site_url($url) {
+  if (!wp_siteurl_is_enabled()) {
+    return $url;
+  }
+
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
+
   return wp_siteurl_url_replace($url, $siteurl, $baseurl);
 }
 
@@ -128,33 +105,50 @@ add_filter( 'script_loader_src', 'wp_siteurl_get_site_url', 1 );
 add_filter( 'style_loader_src', 'wp_siteurl_get_site_url', 1 );
 
 function wp_siteurl_get_home_url($url) {
+  if (!wp_siteurl_is_enabled()) {
+    return $url;
+  }
+
   $homeurl = wp_siteurl_get_option('home');
   $baseurl = wp_siteurl_get_baseurl();
   $result = wp_siteurl_url_replace($url, $homeurl, $baseurl);
+
   return wp_siteurl_url_replace($url, $homeurl, $baseurl);
 }
+
 add_filter( 'option_home', 'wp_siteurl_get_home_url', 1 );
 add_filter( 'home_url', 'wp_siteurl_get_home_url', 1);
 
 
-function wp_siteurl_filter_upload_dir($paths) {
+add_filter( 'upload_dir', function($paths) {
+  if (!wp_siteurl_is_enabled()) {
+    return $paths;
+  }
+
   $paths = array_merge($paths);
   $paths['url'] = wp_siteurl_get_site_url($paths['url']);
   $paths['baseurl'] = wp_siteurl_get_site_url($paths['baseurl']);
+
   return $paths;
-}
-add_filter( 'upload_dir', 'wp_siteurl_filter_upload_dir', 1, 2);
+}, 1, 2);
 
 
-function wp_siteurl_resource_hints($urls) {
+add_filter( 'wp_resource_hints', function($urls) {
+  if (!wp_siteurl_is_enabled()) {
+    return $urls;
+  }
+
   $urls = array_map('wp_siteurl_get_site_url', $urls);
-  // print_r($urls);
+
   return $urls;
-}
-add_filter( 'wp_resource_hints', 'wp_siteurl_resource_hints', 1);
+}, 1);
 
 
 function wp_siteurl_sanitize_content($content) {
+  if (!wp_siteurl_is_enabled()) {
+    return $content;
+  }
+
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
   if ($siteurl == $baseurl) {
@@ -185,6 +179,7 @@ add_filter( 'the_content', 'wp_siteurl_sanitize_content', 1000 );
 add_filter( 'content_edit_pre', 'wp_siteurl_sanitize_content', 1000 );
 
 
+/* Widget support is not stable yet */
 // https://philipnewcomer.net/2014/06/filter-output-wordpress-widget/
 function wp_siteurl_dynamic_sidebar_params() {
   global $wp_registered_widgets;
@@ -199,7 +194,6 @@ function wp_siteurl_dynamic_sidebar_params() {
   $wp_registered_widgets[ $widget_id ]['callback'] = 'wp_bootstrap_widget_callback_function';
 }
 // add_filter( 'dynamic_sidebar_params', 'wp_siteurl_dynamic_sidebar_params' );
-
 
 function wp_siteurl_widget_callback() {
   global $wp_registered_widgets;
@@ -222,7 +216,12 @@ function wp_siteurl_widget_callback() {
 add_filter( 'wpml_home_url', 'wp_siteurl_get_home_url', 1 );
 add_filter( 'wpml_url_converter_get_abs_home', 'wp_siteurl_get_home_url', 1 );
 
-function wp_siteurl_notice() {
+
+add_action( 'admin_notices', function() {
+  if (!wp_siteurl_is_enabled()) {
+    return;
+  }
+
   $id = uniqid();
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
@@ -264,16 +263,13 @@ function wp_siteurl_notice() {
                   $message.html(response.message);
                   $notice.addClass('notice-success');
                   $button.html("Done");
-                  // $notice.find('.notice-actions').hide();
-                  console.log("response: ", response);
                 }).fail(function(xhr, status, error) {
-                    // error handling
-                    console.log("response: ", xhr.responseJSON);
+                    // Handle error
                     $message.html(xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message || error);
                     $notice.addClass('notice-error');
                     $button.html("Try again");
                 }).always(function() {
-                  // $button.hide();
+                  // Set button states
                   $button.removeAttr('disabled');
                   $button.removeClass('is-pending');
                   $spinner.removeClass('is-active');
@@ -289,23 +285,22 @@ function wp_siteurl_notice() {
       <?php endif; ?>
     </div>
   <?php endif;
-}
-add_action( 'admin_notices', 'wp_siteurl_notice' );
+});
 
 
 function wp_siteurl_get_mysql_error() {
-    global $wpdb;
-    $message = '';
-    if($wpdb->last_error !== '') :
-        $str   = htmlspecialchars( $wpdb->last_result, ENT_QUOTES );
-        $query = htmlspecialchars( $wpdb->last_query, ENT_QUOTES );
-        // $message = "<div id='error'>
-        // <p class='wpdberror'><strong>WordPress database error:</strong> [$str]<br />
-        // <code>$query</code></p>
-        // </div>";
-        return $str;
-    endif;
-    return false;
+  global $wpdb;
+
+  $message = '';
+
+  if ($wpdb->last_error !== '') {
+    $str = htmlspecialchars( $wpdb->last_result, ENT_QUOTES );
+    $query = htmlspecialchars( $wpdb->last_query, ENT_QUOTES );
+
+    return $str;
+  };
+
+  return false;
 }
 
 function wp_siteurl_ajax_replace() {
@@ -345,7 +340,9 @@ add_action( 'wp_ajax_siteurl_replace', 'wp_siteurl_ajax_replace' );
 // Replace
 
 function wp_siteurl_sql_replace_url($oldurl, $newurl) {
-  // TODO: Custom Tables
+  global $wpdb;
+
+  // TODO: Custom Tables (WPML etc.)
   $sql[]= "UPDATE wp_posts SET guid = replace(guid, '$oldurl','$newurl')";
   $sql[]= "UPDATE wp_posts SET post_content = replace(post_content, 'src=\"$oldurl', 'src=\"$newurl')";
   $sql[]= "UPDATE wp_posts SET post_content = replace(post_content, 'href=\"$oldurl', 'href=\"$newurl')";
@@ -354,8 +351,7 @@ function wp_siteurl_sql_replace_url($oldurl, $newurl) {
   $sql[]= "UPDATE wp_postmeta SET meta_value = replace(meta_value, '$oldurl', '$newurl')";
   $sql[]= "UPDATE wp_usermeta SET meta_value = replace(meta_value, '$oldurl', '$newurl')";
   $sql[]= "UPDATE wp_options SET option_value = replace(option_value, '$oldurl', '$newurl')";
-  global $wpdb;
-  // $full_query = implode("; ", $sql);
+
   try {
     foreach ($sql as $query) {
       $result = $wpdb->query( $query );
