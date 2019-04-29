@@ -4,7 +4,7 @@
  Plugin Name: Site URL
  Plugin URI: https://github.com/benignware-labs/wp-siteurl
  Description: Fix Site URL Conflicts
- Version: 0.0.3
+ Version: 0.0.4
  Author: Rafael Nowrotek, Benignware
  Author URI: http://benignware.com
  License: MIT
