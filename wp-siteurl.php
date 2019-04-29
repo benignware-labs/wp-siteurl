@@ -30,21 +30,25 @@ function wp_siteurl_is_enabled() {
 }
 
 function wp_siteurl_get_baseurl() {
-  if (defined('WP_BASE_URL')) {
-    return WP_BASE_URL;
-  }
+  $abs_path = rtrim(ABSPATH ? ABSPATH : get_home_path(), '/');
 
-  $path = ABSPATH ? ABSPATH : get_home_path();
-
-  if (file_exists(dirname($path) . "/wp-config.php")) {
-    $file = dirname($path) . "/wp-config.php";
+  if (file_exists(dirname($abs_path) . DIRECTORY_SEPARATOR . 'wp-config.php')) {
+    $config_file = dirname($abs_path) . DIRECTORY_SEPARATOR . 'wp-config.php';
   } else {
-    $file = $path . "/wp-config.php";
+    $config_file = $abs_path . DIRECTORY_SEPARATOR . 'wp-config.php';
   }
 
-  $url = rtrim( (((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . "/" . trim(dirname(str_replace($_SERVER['DOCUMENT_ROOT'], '', $file)), "./"), "/" );
+  $document_root = stripslashes($_SERVER['DOCUMENT_ROOT']);
 
-  return $url;
+  $protocol = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' || $_SERVER['SERVER_PORT'] == 443
+    ? 'https'
+    : 'http';
+  $hostname = $_SERVER['HTTP_HOST'];
+  $pathname = rtrim(dirname(str_replace($document_root, '', $config_file)), './\\');
+
+  $base_url = $protocol . '://' . $hostname . ($pathname ? '/' : '') . $pathname;
+
+  return $base_url;
 }
 
 function wp_siteurl_get_option($name = 'siteurl') {
