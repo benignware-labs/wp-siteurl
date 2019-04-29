@@ -1,6 +1,6 @@
 # wp-siteurl
 
-> Fix Site URL Conflicts
+Fix Site Url Conflicts
 
 ## Install
 
@@ -87,8 +87,6 @@ See an example how to require siteurl as muplugin in `composer.json`:
 ## Development
 
 Download [Docker CE](https://www.docker.com/get-docker) for your OS.
-
-### Environment
 
 Point terminal to your project root and start up the container.
 
