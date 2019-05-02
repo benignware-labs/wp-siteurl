@@ -4,7 +4,7 @@
  Plugin Name: Site URL
  Plugin URI: https://github.com/benignware-labs/wp-siteurl
  Description: Fix Site URL Conflicts
- Version: 0.0.4
+ Version: 0.0.5
  Author: Rafael Nowrotek, Benignware
  Author URI: http://benignware.com
  License: MIT
@@ -21,12 +21,25 @@ function wp_siteurl_env() {
   )) ? 'development' : 'production';
 }
 
+function wp_siteurl_get_options() {
+  return apply_filters('siteurl_options', array_merge(
+    array(
+      'environment' => array(
+        'production' => 1,
+        'development' => 1
+      )
+    ), get_option('siteurl_options') ?: array()
+  ));
+}
+
 function wp_siteurl_is_enabled() {
   $env = wp_siteurl_env();
-  $options = get_option('siteurl_options');
+  $options = wp_siteurl_get_options();
 
-  return ($env === 'development' && $options['environment']['development'])
+  $is_enabled = ($env === 'development' && $options['environment']['development'])
     || ($env === 'production' && $options['environment']['production']);
+
+  return $is_enabled;
 }
 
 function wp_siteurl_get_baseurl() {
@@ -230,7 +243,8 @@ add_action( 'admin_notices', function() {
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
   $message = "Site URL <code>$siteurl</code> conflicts with Base URL <code>$baseurl</code>";
-  if ($siteurl != $baseurl) : ?>
+
+  if ($siteurl !== $baseurl) : ?>
     <div id="siteurl-notice-<?= $id; ?>" class="notice notice-warning is-dismissible">
       <h3 class="notice-title">Site URL Conflict</h3>
       <p class="notice-message">
@@ -366,5 +380,31 @@ function wp_siteurl_sql_replace_url($oldurl, $newurl) {
   return $result;
 }
 
+
+add_filter('wp_get_attachment_url', function($url, $post_id = null) {
+  if (!wp_siteurl_is_enabled()) {
+    return;
+  }
+
+  $siteurl = wp_siteurl_get_option('siteurl');
+  $baseurl = wp_siteurl_get_baseurl();
+
+  if ($siteurl !== $baseurl) {
+    $home_path = rtrim(ABSPATH ? ABSPATH : get_home_path(), '/');
+    $upload_dir = wp_get_upload_dir();
+    $url_info = parse_url($url);
+    $url_path = $url_info['path'];
+
+    $upload_dir_path = str_replace($home_path, '', $upload_dir['basedir']);
+    $attachment_src_path = str_replace($upload_dir_path, '', $url_path);
+    $attachment_src = $home_path . $upload_dir_path . $attachment_src_path;
+
+    if (!file_exists($attachment_src)) {
+      $url = $siteurl . $url_path;
+    }
+  }
+
+  return $url;
+});
 
 ?>

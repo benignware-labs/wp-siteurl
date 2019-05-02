@@ -17,7 +17,7 @@ add_action('admin_menu', function() {
 });
 
 function siteurl_options_page() {
-  $options = get_option('siteurl_options');
+  $options = wp_siteurl_get_options();
 
   ?>
     <div class="wrap">
