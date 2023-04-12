@@ -27,7 +27,8 @@ function wp_siteurl_get_options() {
       'environment' => array(
         'production' => 1,
         'development' => 1
-      )
+      ),
+      'uploads' => 'local'
     ), get_option('siteurl_options') ?: array()
   ));
 }
@@ -110,16 +111,18 @@ function wp_siteurl_get_site_url($url) {
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
 
-  return wp_siteurl_url_replace($url, $siteurl, $baseurl);
+  $result = wp_siteurl_url_replace($url, $siteurl, $baseurl);
+
+  return $result;
 }
 
-add_filter( 'option_siteurl', 'wp_siteurl_get_site_url', 1 );
-add_filter( 'site_url', 'wp_siteurl_get_site_url', 1);
-add_filter( 'admin_url', 'wp_siteurl_get_site_url', 1);
-add_filter( 'content_url', 'wp_siteurl_get_site_url', 1);
-add_filter( 'plugins_url', 'wp_siteurl_get_site_url', 1);
-add_filter( 'script_loader_src', 'wp_siteurl_get_site_url', 1 );
-add_filter( 'style_loader_src', 'wp_siteurl_get_site_url', 1 );
+add_filter( 'option_siteurl', 'wp_siteurl_get_site_url', 100 );
+add_filter( 'site_url', 'wp_siteurl_get_site_url', 100);
+add_filter( 'admin_url', 'wp_siteurl_get_site_url', 100);
+add_filter( 'content_url', 'wp_siteurl_get_site_url', 100);
+add_filter( 'plugins_url', 'wp_siteurl_get_site_url', 100);
+add_filter( 'script_loader_src', 'wp_siteurl_get_site_url', 100 );
+add_filter( 'style_loader_src', 'wp_siteurl_get_site_url', 100 );
 
 function wp_siteurl_get_home_url($url) {
   if (!wp_siteurl_is_enabled()) {
@@ -142,9 +145,13 @@ add_filter( 'upload_dir', function($paths) {
     return $paths;
   }
 
-  $paths = array_merge($paths);
-  $paths['url'] = wp_siteurl_get_site_url($paths['url']);
-  $paths['baseurl'] = wp_siteurl_get_site_url($paths['baseurl']);
+  $options = wp_siteurl_get_options();
+
+  if ($options['uploads'] === 'local') {
+    $paths = array_merge($paths); // Copy of array really needed?
+    $paths['url'] = wp_siteurl_get_site_url($paths['url']);
+    $paths['baseurl'] = wp_siteurl_get_site_url($paths['baseurl']);
+  }
 
   return $paths;
 }, 1, 2);
@@ -166,6 +173,8 @@ function wp_siteurl_sanitize_content($content) {
     return $content;
   }
 
+  echo '<textarea>' . $content . '</textarea>';
+
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
   if ($siteurl == $baseurl) {
@@ -178,22 +187,45 @@ function wp_siteurl_sanitize_content($content) {
   $doc_xpath = new DOMXpath($doc);
 
   // Sanitize URLs
-  $attributes = array('src', 'href');
-  $query_parts = array();
-  foreach ($attributes as $attribute) {
-    $query_parts[] = "//*[starts-with(@$attribute, '$siteurl')]";
-  }
-  $query = implode("|", $query_parts);
-  $siteurl_elements = $doc_xpath->query($query);
+  $attributes = array('src', 'href', 'srcset');
+  // $query_parts = array();
+  // foreach ($attributes as $attribute) {
+  //   $query_parts[] = "//*[starts-with(@$attribute, '$siteurl')]";
+  // }
+
+  // $query = implode("|", $query_parts);
+  
+  // $siteurl_elements = $doc_xpath->query($query);
+  // foreach ($siteurl_elements as $siteurl_element) {
+  //   foreach ($attributes as $attribute) {
+  //     $siteurl_element->setAttribute($attribute, wp_siteurl_get_site_url($siteurl_element->getAttribute($attribute)));
+  //   }
+  // }
+
+  
+
+  $siteurl_elements = $doc_xpath->query('//img|//video|//audio');
+
+  // print_r($siteurl_elements);
+
   foreach ($siteurl_elements as $siteurl_element) {
     foreach ($attributes as $attribute) {
-      $siteurl_element->setAttribute($attribute, wp_siteurl_get_site_url($siteurl_element->getAttribute($attribute)));
+      if ($siteurl_element->hasAttribute($attribute)) {
+        $old_url = $siteurl_element->getAttribute($attribute);
+        // echo $attribute . ' => ' . $old_url;
+        // echo '<br/>';
+        $new_url = wp_siteurl_get_site_url($old_url);
+        $siteurl_element->setAttribute($attribute, $new_url);
+      } 
     }
   }
+
   return preg_replace('~(?:<\?[^>]*>|<(?:!DOCTYPE|/?(?:html|head|body))[^>]*>)\s*~i', '', $doc->saveHTML());
 }
-add_filter( 'the_content', 'wp_siteurl_sanitize_content', 1000 );
-add_filter( 'content_edit_pre', 'wp_siteurl_sanitize_content', 1000 );
+// add_filter( 'the_content', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
+// add_filter( 'content_edit_pre', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
+// add_filter( 'wp_get_attachment_image', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
+
 
 
 /* Widget support is not stable yet */

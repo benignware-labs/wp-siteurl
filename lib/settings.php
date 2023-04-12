@@ -6,7 +6,8 @@ add_action( 'admin_init', function() {
       'environment' => array(
         'development' => 1,
         'production' => 1
-      )
+      ),
+      'uploads' => 'local'
     )
   ));
 });
@@ -53,6 +54,34 @@ function siteurl_options_page() {
                 </label>
               </div>
               <p class="description"><?= __('Specify environments in which to use the plugin', 'siteurl'); ?></p>
+            </td>
+          </tr>
+          <tr valign="top">
+            <th scope="row">
+              <label>Uploads</label>
+            </th>
+            <td>
+              <div>
+                <label>
+                  <input
+                    type="radio"
+                    name="siteurl_options[uploads]"
+                    value="local" <?php checked( $options['uploads'] === 'local', 1 ); ?>
+                  />
+                  <?= __('Local', 'siteurl'); ?>
+                </label>
+              <div>
+              <div>
+                <label>
+                  <input
+                    type="radio"
+                    name="siteurl_options[uploads]"
+                    value="remote" <?php checked( $options['uploads'] === 'remote', 1 ); ?>
+                  />
+                  <?= __('Remote', 'siteurl'); ?>
+                </label>
+              </div>
+              <p class="description"><?= __('Specify whether to use local or remote upload dir', 'siteurl'); ?></p>
             </td>
           </tr>
         </table>
