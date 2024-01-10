@@ -4,13 +4,14 @@
  Plugin Name: Site URL
  Plugin URI: https://github.com/benignware-labs/wp-siteurl
  Description: Fix Site URL Conflicts
- Version: 0.0.6
+ Version: 0.0.7
  Author: Rafael Nowrotek, Benignware
  Author URI: http://benignware.com
  License: MIT
 */
 
 require_once 'lib/settings.php';
+
 
 function wp_siteurl_env() {
   return in_array($_SERVER['SERVER_NAME'], array(
@@ -100,6 +101,7 @@ function wp_siteurl_url_replace($url, $search_url = '', $replace_url = '') {
   } else {
     $new_url = $url;
   }
+
   return $new_url;
 }
 
@@ -111,7 +113,14 @@ function wp_siteurl_get_site_url($url) {
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
 
-  $result = wp_siteurl_url_replace($url, $siteurl, $baseurl);
+  $siteurl_canonical = rtrim($siteurl, '/');
+  $baseurl_canonical = rtrim($baseurl, '/');
+
+  $result = wp_siteurl_url_replace($url, $siteurl_canonical, $baseurl_canonical);
+
+  if (in_array($result, [$siteurl_canonical, $baseurl_canonical]) && preg_match('~\/$~', $url)) {
+    $result = rtrim($result, '/') . '/';
+  }
 
   return $result;
 }
@@ -131,14 +140,21 @@ function wp_siteurl_get_home_url($url) {
 
   $homeurl = wp_siteurl_get_option('home');
   $baseurl = wp_siteurl_get_baseurl();
-  $result = wp_siteurl_url_replace($url, $homeurl, $baseurl);
 
-  return wp_siteurl_url_replace($url, $homeurl, $baseurl);
+  $homeurl_canonical = rtrim($homeurl, '/');
+  $baseurl_canonical = rtrim($baseurl, '/');
+
+  $result = wp_siteurl_url_replace($url, $homeurl_canonical, $baseurl_canonical);
+
+  if (in_array($result, [$homeurl_canonical, $baseurl_canonical]) && preg_match('~\/$~', $url)) {
+    $result = rtrim($result, '/') . '/';
+  }
+
+  return $result;
 }
 
 add_filter( 'option_home', 'wp_siteurl_get_home_url', 1 );
 add_filter( 'home_url', 'wp_siteurl_get_home_url', 1);
-
 
 add_filter( 'upload_dir', function($paths) {
   if (!wp_siteurl_is_enabled()) {
@@ -173,58 +189,39 @@ function wp_siteurl_sanitize_content($content) {
     return $content;
   }
 
-  echo '<textarea>' . $content . '</textarea>';
+  if (is_array(($content))) {
+    $content = array_map(function($value) {
+      return wp_siteurl_sanitize_content($value);
+    }, $content);
+
+    return $content;
+  }
 
   $siteurl = wp_siteurl_get_option('siteurl');
   $baseurl = wp_siteurl_get_baseurl();
-  if ($siteurl == $baseurl) {
-    // Everything fine
-    return $content;
-  }
-  // Parse DOM
-  $doc = new DOMDocument();
-  @$doc->loadHTML('<?xml encoding="utf-8" ?>' . $content );
-  $doc_xpath = new DOMXpath($doc);
+  $siteurl_canonical = rtrim($siteurl, '/');
+  $baseurl_canonical = rtrim($baseurl, '/');
+  $site_url_canonical_without_prototcol = preg_replace('/^https?/', '', $siteurl_canonical);
 
-  // Sanitize URLs
-  $attributes = array('src', 'href', 'srcset');
-  // $query_parts = array();
-  // foreach ($attributes as $attribute) {
-  //   $query_parts[] = "//*[starts-with(@$attribute, '$siteurl')]";
-  // }
+  $pattern = sprintf('/https?%s/', preg_quote($site_url_canonical_without_prototcol, '/'));
+  $content = preg_replace($pattern, $baseurl_canonical, $content);
 
-  // $query = implode("|", $query_parts);
-  
-  // $siteurl_elements = $doc_xpath->query($query);
-  // foreach ($siteurl_elements as $siteurl_element) {
-  //   foreach ($attributes as $attribute) {
-  //     $siteurl_element->setAttribute($attribute, wp_siteurl_get_site_url($siteurl_element->getAttribute($attribute)));
-  //   }
-  // }
-
-  
-
-  $siteurl_elements = $doc_xpath->query('//img|//video|//audio');
-
-  // print_r($siteurl_elements);
-
-  foreach ($siteurl_elements as $siteurl_element) {
-    foreach ($attributes as $attribute) {
-      if ($siteurl_element->hasAttribute($attribute)) {
-        $old_url = $siteurl_element->getAttribute($attribute);
-        // echo $attribute . ' => ' . $old_url;
-        // echo '<br/>';
-        $new_url = wp_siteurl_get_site_url($old_url);
-        $siteurl_element->setAttribute($attribute, $new_url);
-      } 
-    }
-  }
-
-  return preg_replace('~(?:<\?[^>]*>|<(?:!DOCTYPE|/?(?:html|head|body))[^>]*>)\s*~i', '', $doc->saveHTML());
+  return $content;
 }
-// add_filter( 'the_content', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
-// add_filter( 'content_edit_pre', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
+
+add_filter( 'the_content', 'wp_siteurl_sanitize_content', 5 );
+add_filter( 'content_edit_pre', 'wp_siteurl_sanitize_content', 5 );
+add_filter( 'get_avatar_url', 'wp_siteurl_sanitize_content', 5 );
+
 // add_filter( 'wp_get_attachment_image', 'wp_siteurl_sanitize_content', PHP_INT_MAX );
+
+
+add_filter('wp_nav_menu_objects', function($items) {
+  foreach($items as $item) {
+    $item->url = wp_siteurl_sanitize_content($item->url);
+  }
+  return $items;
+} , 10);
 
 
 
@@ -234,7 +231,7 @@ function wp_siteurl_dynamic_sidebar_params() {
   global $wp_registered_widgets;
   $original_callback_params = func_get_args();
   $widget_id = $original_callback_params[0]['widget_id'];
-  echo "PHP" . phpversion();
+  // echo "PHP" . phpversion();
   // $original_callback = $wp_registered_widgets[ $widget_id ]['original_callback'];
   // $wp_registered_widgets[ $widget_id ]['callback'] = $original_callback;
 
@@ -261,11 +258,39 @@ function wp_siteurl_widget_callback() {
 }
 
 
+add_filter('wp_get_attachment_url', function($url, $post_id = null) {
+  if (!wp_siteurl_is_enabled()) {
+    return;
+  }
+
+  $siteurl = wp_siteurl_get_option('siteurl');
+  $baseurl = wp_siteurl_get_baseurl();
+
+  if ($siteurl !== $baseurl) {
+    $home_path = rtrim(ABSPATH ? ABSPATH : get_home_path(), '/');
+    $upload_dir = wp_get_upload_dir();
+    $url_info = parse_url($url);
+    $url_path = $url_info['path'];
+
+    $upload_dir_path = str_replace($home_path, '', $upload_dir['basedir']);
+    $attachment_src_path = str_replace($upload_dir_path, '', $url_path);
+    $attachment_src = $home_path . $upload_dir_path . $attachment_src_path;
+
+    if (!file_exists($attachment_src)) {
+      $url = rtrim($siteurl, '/') . $url_path;
+    }
+  }
+
+  return $url;
+});
+
+
 /* Third Party Support */
 add_filter( 'wpml_home_url', 'wp_siteurl_get_home_url', 1 );
 add_filter( 'wpml_url_converter_get_abs_home', 'wp_siteurl_get_home_url', 1 );
 
 
+/* Admin */
 add_action( 'admin_notices', function() {
   if (!wp_siteurl_is_enabled()) {
     return;
@@ -413,30 +438,6 @@ function wp_siteurl_sql_replace_url($oldurl, $newurl) {
 }
 
 
-add_filter('wp_get_attachment_url', function($url, $post_id = null) {
-  if (!wp_siteurl_is_enabled()) {
-    return;
-  }
-
-  $siteurl = wp_siteurl_get_option('siteurl');
-  $baseurl = wp_siteurl_get_baseurl();
-
-  if ($siteurl !== $baseurl) {
-    $home_path = rtrim(ABSPATH ? ABSPATH : get_home_path(), '/');
-    $upload_dir = wp_get_upload_dir();
-    $url_info = parse_url($url);
-    $url_path = $url_info['path'];
-
-    $upload_dir_path = str_replace($home_path, '', $upload_dir['basedir']);
-    $attachment_src_path = str_replace($upload_dir_path, '', $url_path);
-    $attachment_src = $home_path . $upload_dir_path . $attachment_src_path;
-
-    if (!file_exists($attachment_src)) {
-      $url = $siteurl . $url_path;
-    }
-  }
-
-  return $url;
-});
+require_once 'int/acf.php';
 
 ?>

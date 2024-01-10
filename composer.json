@@ -1,6 +1,6 @@
 {
   "name": "benignware/wp-siteurl",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "wordpress-muplugin",
   "license": "MIT",
   "description": "Fix Site Url Conflicts",
@@ -21,7 +21,10 @@
     "issues": "https://github.com/benignware-labs/wp-siteurl/issues"
   },
   "config": {
-    "vendor-dir": "vendor/lib"
+    "vendor-dir": "vendor/lib",
+    "allow-plugins": {
+      "composer/installers": true
+    }
   },
   "repositories": [{
     "type": "composer",
